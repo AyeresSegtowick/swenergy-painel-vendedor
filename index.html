@@ -2,22 +2,31 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Painel do Vendedor - SW Energy</title>
+  <title>Painel SW Energy</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
 </head>
 <body>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(() => console.log("Service Worker registrado"))
+      .catch(error => console.error("Erro no SW:", error));
+  }
+</script>
 
 <header>
   <div class="logos">
     <img src="logo sw.png" alt="Logo SW Energy" />
   </div>
-  <div><strong>Painel de Vendas</strong></div>
+  <strong>Painel de Vendas</strong>
 </header>
 
 <div id="loginArea">
-  <h2>Login do Vendedor</h2>
-  <input type="text" id="usuario" placeholder="Nome do vendedor" autocomplete="username" />
-  <input type="password" id="senha" placeholder="Senha" autocomplete="current-password" />
+  <h2>Login</h2>
+  <input type="text" id="usuario" placeholder="Nome do vendedor" />
+  <input type="password" id="senha" placeholder="Senha" />
   <button onclick="logar()">Entrar</button>
 </div>
 
@@ -29,7 +38,7 @@
         <th>Data</th>
         <th>Cliente</th>
         <th>kWh</th>
-        <th>Comissão (R$)</th>
+        <th>Comissão</th>
       </tr>
     </thead>
     <tbody id="dadosTabela"></tbody>
@@ -46,57 +55,67 @@
     const senha = document.getElementById("senha").value;
 
     if (!usuario || !senha) {
-      alert("Preencha usuário e senha.");
+      alert("Preencha todos os campos.");
       return;
     }
 
     try {
       const res = await fetch(API_LOGIN_URL);
-      const usuarios = await res.json();
-      const user = (usuarios.data || usuarios).find(u => u.usuario?.toLowerCase() === usuario);
+      const data = await res.json();
+      const usuarios = data.data || data;
 
-      if (!user) return alert("Usuário não encontrado.");
-      if (user.senha !== senha) return alert("Senha incorreta.");
+      const usuarioEncontrado = usuarios.find(u =>
+        u.usuario?.toLowerCase() === usuario && u.senha === senha
+      );
 
-      document.getElementById("loginArea").style.display = "none";
-      document.getElementById("painel").style.display = "block";
-      document.getElementById("nomeVendedor").innerText = user.usuario;
-      carregarDadosVendedor(usuario);
-    } catch (err) {
-      console.error(err);
-      alert("Erro no login.");
-    }
-  }
-
-  async function carregarDadosVendedor(usuario) {
-    try {
-      const res = await fetch(API_DADOS_URL);
-      const dados = await res.json();
-      const lista = dados.data || dados;
-      const tabela = document.getElementById("dadosTabela");
-      tabela.innerHTML = "";
-
-      const registros = lista.filter(r => r.vendedor?.toLowerCase() === usuario);
-
-      if (registros.length === 0) {
-        tabela.innerHTML = "<tr><td colspan='4'>Nenhum registro encontrado.</td></tr>";
+      if (!usuarioEncontrado) {
+        alert("Usuário ou senha inválidos.");
         return;
       }
 
-      registros.forEach(row => {
-        const comissao = parseFloat((row.comissao_reais || "0").replace(",", ".")) || 0;
-        tabela.innerHTML += `
+      document.getElementById("loginArea").style.display = "none";
+      document.getElementById("painel").style.display = "block";
+      document.getElementById("nomeVendedor").innerText = usuarioEncontrado.usuario;
+
+      carregarDados(usuario);
+    } catch (error) {
+      console.error("Erro no login:", error);
+      alert("Erro ao acessar dados de login.");
+    }
+  }
+
+  async function carregarDados(usuario) {
+    try {
+      const res = await fetch(API_DADOS_URL);
+      const data = await res.json();
+      const registros = (data.data || data).filter(r =>
+        r.vendedor?.toLowerCase() === usuario
+      );
+
+      const tabela = document.getElementById("dadosTabela");
+      tabela.innerHTML = "";
+
+      if (registros.length === 0) {
+        tabela.innerHTML = "<tr><td colspan='4'>Nenhum dado encontrado.</td></tr>";
+        return;
+      }
+
+      registros.forEach(r => {
+        const comissao = parseFloat((r.comissao_reais || "0").replace(",", ".")) || 0;
+        const linha = `
           <tr>
-            <td>${row.data || '-'}</td>
-            <td>${row.cliente || '-'}</td>
-            <td>${row.kwh || '-'}</td>
+            <td>${r.data || '-'}</td>
+            <td>${r.cliente || '-'}</td>
+            <td>${r.kwh || '-'}</td>
             <td>${comissao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
           </tr>
         `;
+        tabela.innerHTML += linha;
       });
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao carregar dados.");
+
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+      alert("Erro ao carregar dados das vendas. Verifique sua conexão ou o link da planilha.");
     }
   }
 
