@@ -2,58 +2,112 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SW Energy</title>
+  <title>Painel do Vendedor - SW Energy</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="logo sw.png" type="image/png" />
 </head>
 <body>
-  <main>
-    <section id="vendas">
-      <h2>Informações das Vendas</h2>
-      <div id="dados-vendas" class="tabela-vendas">Carregando dados...</div>
-    </section>
-  </main>
 
-  <footer>
-    <p>&copy; 2025 SW Energy. Todos os direitos reservados.</p>
-  </footer>
+<header>
+  <div class="logos">
+    <img src="logo sw.png" alt="Logo SW Energy" />
+  </div>
+  <div><strong>Painel de Vendas</strong></div>
+</header>
 
-  <script>
-    // Substitua com sua URL real do SheetDB com o nome da aba correto
-    fetch("https://sheetdb.io/api/v1/l8mnon8vtbghj?sheet=P%C3%A1gina%202")
-      .then(response => response.json())
-      .then(data => {
-        const container = document.getElementById("dados-vendas");
-        if (data.length === 0) {
-          container.innerHTML = "<p>Nenhum registro encontrado.</p>";
-          return;
-        }
+<div id="loginArea">
+  <h2>Login do Vendedor</h2>
+  <input type="text" id="usuario" placeholder="Nome do vendedor" autocomplete="username" />
+  <input type="password" id="senha" placeholder="Senha" autocomplete="current-password" />
+  <button onclick="logar()">Entrar</button>
+</div>
 
-        let tabela = "<table><thead><tr>";
-        // Gera os cabeçalhos
-        Object.keys(data[0]).forEach(coluna => {
-          tabela += `<th>${coluna}</th>`;
-        });
-        tabela += "</tr></thead><tbody>";
+<div id="painel" style="display:none;">
+  <h2>Bem-vindo, <span id="nomeVendedor"></span></h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Cliente</th>
+        <th>kWh</th>
+        <th>Comissão (R$)</th>
+      </tr>
+    </thead>
+    <tbody id="dadosTabela"></tbody>
+  </table>
+  <button onclick="logout()">Sair</button>
+</div>
 
-        // Gera os dados
-        data.forEach(linha => {
-          tabela += "<tr>";
-          Object.values(linha).forEach(valor => {
-            tabela += `<td>${valor}</td>`;
-          });
-          tabela += "</tr>";
-        });
+<script>
+  const API_LOGIN_URL = "https://sheetdb.io/api/v1/i3mmwap91vgg4";
+  const API_DADOS_URL = "https://sheetdb.io/api/v1/l8mnon8vtbghj";
 
-        tabela += "</tbody></table>";
-        container.innerHTML = tabela;
-      })
-      .catch(error => {
-        console.error("Erro ao carregar os dados:", error);
-        document.getElementById("dados-vendas").innerHTML =
-          "<p>Erro ao carregar os dados.</p>";
+  async function logar() {
+    const usuario = document.getElementById("usuario").value.trim().toLowerCase();
+    const senha = document.getElementById("senha").value;
+
+    if (!usuario || !senha) {
+      alert("Preencha usuário e senha.");
+      return;
+    }
+
+    try {
+      const res = await fetch(API_LOGIN_URL);
+      const usuarios = await res.json();
+      const user = (usuarios.data || usuarios).find(u => u.usuario?.toLowerCase() === usuario);
+
+      if (!user) return alert("Usuário não encontrado.");
+      if (user.senha !== senha) return alert("Senha incorreta.");
+
+      document.getElementById("loginArea").style.display = "none";
+      document.getElementById("painel").style.display = "block";
+      document.getElementById("nomeVendedor").innerText = user.usuario;
+      carregarDadosVendedor(usuario);
+    } catch (err) {
+      console.error(err);
+      alert("Erro no login.");
+    }
+  }
+
+  async function carregarDadosVendedor(usuario) {
+    try {
+      const res = await fetch(API_DADOS_URL);
+      const dados = await res.json();
+      const lista = dados.data || dados;
+      const tabela = document.getElementById("dadosTabela");
+      tabela.innerHTML = "";
+
+      const registros = lista.filter(r => r.vendedor?.toLowerCase() === usuario);
+
+      if (registros.length === 0) {
+        tabela.innerHTML = "<tr><td colspan='4'>Nenhum registro encontrado.</td></tr>";
+        return;
+      }
+
+      registros.forEach(row => {
+        const comissao = parseFloat((row.comissao_reais || "0").replace(",", ".")) || 0;
+        tabela.innerHTML += `
+          <tr>
+            <td>${row.data || '-'}</td>
+            <td>${row.cliente || '-'}</td>
+            <td>${row.kwh || '-'}</td>
+            <td>${comissao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+          </tr>
+        `;
       });
-  </script>
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao carregar dados.");
+    }
+  }
+
+  function logout() {
+    document.getElementById("loginArea").style.display = "block";
+    document.getElementById("painel").style.display = "none";
+    document.getElementById("usuario").value = "";
+    document.getElementById("senha").value = "";
+    document.getElementById("dadosTabela").innerHTML = "";
+  }
+</script>
+
 </body>
 </html>
